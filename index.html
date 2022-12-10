@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/x-icon" href="./favicon.ico">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link rel="stylesheet" href="./style.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css"
+    integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link href="https://unpkg.com/video.js/dist/video-js.css" rel="stylesheet">
+    <script src="./script.js"></script>
+    <script src="https://unpkg.com/video.js/dist/alt/video.core.js"></script>
+    <script src="https://unpkg.com/@videojs/http-streaming@1/dist/videojs-http-streaming.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-quality-levels/2.0.9/videojs-contrib-quality-levels.min.js"></script>
+    <title>Anime Stream</title>
+</head>
+<body>
+    <div id="main-container">
+        <!-- <div id="eptitle">
+        </div> -->
+        <div class="wrap">
+            <div class="search">
+            <input type="text" class="searchTerm" placeholder="Anime name...">
+            <button onclick="searchAnime()" id="playbutton" type="submit" class="searchButton">
+                <i class="fa fa-search"></i>
+            </button>
+            </div>
+        </div>
+        <div class="animebox">
+            <p id="maintitle">Anime Details</p>
+            <p id="details">No Search Query!</p>
+        </div>
+        <div id="mainplayer" class="mainplayer">
+            <h1 id="episodetitle">Sample Name</h1>
+            <video id="animestream" class="video-js vjs-default-skin  vjs-16-9 vjs-big-play-centered " controls preload="auto">
+                <source src="" type="application/x-mpegURL">
+            </video>
+            <button id="setMinLevel">min quality</button>
+            <button id="setMaxLevel">max quality</button>
+            <script id="playerscript"></script>
+        </div>
+        <script async>
+            const maincontainer = document.getElementById('wrap')
+            const videotag = document.getElementById("video");
+            const button = document.getElementById("playvideo");
+            const main = document.getElementById("mainplayer");
+            const script = document.getElementById("playerscript");
+            const search = document.querySelector(".searchTerm");
+            const details = document.getElementById("details");
+            const animebox = document.querySelector(".animebox")
+            const episodename = document.getElementById("episodetitle");
+            let animeid;
+            let episodeid;
+            var player = videojs('animestream', {
+            controls: true,
+            fluid: true,        
+            html5: { 
+                vhs: {
+                    overrideNative: true,
+                    enableLowInitialPlaylist: true, // see https://github.com/videojs/http-streaming
+                    bandwidth: 10285391,
+                    limitRenditionByPlayerDimensions: false,
+                    smoothQualityChange: false,
+                    experimentalBufferBasedABR: true,
+                    handlePartialData: true
+                },        
+                nativeCaptions: false ,
+                nativeAudioTracks: false,
+                nativeVideoTracks: false
+            }
+               
+        });
+            const apiurl = "https://api.consumet.org/anime/enime/"
+            main.style.display = "none"
+            maincontainer.style.display = "none"
+            async function searchAnime() {
+                words = search.value
+                url = apiurl + words
+                const res = await fetch(url);
+                const data = await res.json();
+                animedata = data.results[0]
+                showAnime(animedata)
+                main.style.display = "none"
+                animebox.style.display = ""
+            }
+
+            async function showAnime(data) {
+                animeid = data.id
+                title = data.title
+                date = data.releaseDate
+                genres = data.genres.join(", ")
+                details.innerHTML = `
+                <p>
+                <b>Title: </b>${title}</br>
+                <b>Date: </b>${date}</br> 
+                <b>Title: </b>${genres}</br>
+                <b>Rating: </b>${data.rating}</br>
+                <b>Status: </b>${data.status}</br>
+                <b>Type: </b>${data.type}</br>
+                <h4 id="progtext">Give me an episode number!</h4>
+                <input id="episodeNumber" class="srchTerm"></input></br></br>
+                <button onclick="getAnimeInfo()" id="infobutton" type="submit" class="searchButton">Play</button>
+                `
+            }
+
+            async function getAnimeInfo() {
+                console.log('info func called')
+                console.log('hi im here')
+                document.getElementById('episodeNumber').style.display = "none"
+                document.getElementById('infobutton').style.display = "none"
+                episodenum = document.getElementById('episodeNumber').value
+                document.getElementById('progtext').innerHTML = `Please wait...</br><img id="loadinggif" src="./loading.gif" width="100" height="75">`
+                infourl = "https://api.consumet.org/anime/enime/info?id=" + animeid
+                const resp = await fetch(infourl);
+                const data = await resp.json();
+                let episode = data.episodes.find(ep => ep.number == Number(episodenum))
+                episodeid = episode.id
+                episodetitle = episode.title
+                episodename.innerText = `Episode: ${episode.number} - ${episodetitle} HD`
+                episodeurl = "https://api.consumet.org/anime/enime/watch?episodeId=" + episodeid
+                const epresp = await fetch(episodeurl);
+                const epdata = await epresp.json();
+                await playVideo(epdata.sources[epdata.sources.length - 2].url, data.cover)
+                document.body.style.background = `url("${data.cover}")`
+                main.style.display = ""
+            }
+
+            async function playVideo(url, poster) {
+                player.src({
+                src: url,
+                type: 'application/x-mpegURL'});
+                document.getElementById('animestream').setAttribute("poster", poster)
+                document.getElementById('progtext').innerHTML = `Playing episode <code>${episodenum}</code> now!`
+                videoattached = true
+                animebox.style.display = "none"
+                let qualityLevels = player.qualityLevels();
+
+                for (var i = 0; i < qualityLevels.length; i++) {
+                    var quality = qualityLevels[i];
+                    if (quality.width >= 1080) {
+                        console.log('playing 1080p')
+                        quality.enabled = true;
+                    } else {
+                        quality.enabled = false;
+                    }
+                    }
+
+                // document.getElementById("setMinLevel").addEventListener('click', () => {
+                //     console.log("Set Min quality level")
+                //     enableQualityLevel(0);          
+                // })
+
+                // document.getElementById("setMaxLevel").addEventListener('click', () => {
+                //     console.log("Set Max quality level")
+                //     enableQualityLevel(qualityLevels.length-1); 
+                // })   
+
+                // let enableQualityLevel = level => {
+
+                //     for (var i = 0; i < qualityLevels.length; i++) {
+                //         let qualityLevel = qualityLevels[i];
+                //         qualityLevel.enabled = i === level ? true : false;
+                //     }
+
+                //     qualityLevels.selectedIndex_ = level;
+                //     qualityLevels.trigger({ type: 'change', selectedIndex: level });    
+                //     }
+
+                // console.log("Set Max quality level")
+                // enableQualityLevel(qualityLevels.length-1); 
+                qualityLevels.on('change', function () {
+                    console.log('Quality Level changed!');
+                    console.log('New level:', qualityLevels[qualityLevels.selectedIndex]);
+                });      
+
+
+        // // set min quality level
+        // document.getElementById("setMinLevel").addEventListener('click', () => {
+        //     console.log("Set Min quality level")
+        //     enableQualityLevel(0);          
+
+        //     console.log("qualityLevels.selectedIndex: ", qualityLevels.selectedIndex);
+            
+        //     showEnabledLevels();
+        // })
+
+        // set max quality level 
+        // document.getElementById("setMaxLevel").addEventListener('click', () => {
+        //     console.log("Set Max quality level")
+        //     enableQualityLevel(qualityLevels.length-1); 
+
+        //     console.log("qualityLevels.selectedIndex: ", qualityLevels.selectedIndex);
+
+        //     showEnabledLevels();
+        // })        
+
+        // player.on('timeupdate', function (){
+        //     console.log("Playing now: ", player.videoHeight());
+        // })
+
+        // player.on('loadedmetadata', function () {
+
+        //     // enable buttons
+        //     document.getElementById("setMinLevel").disabled = false;
+        //     document.getElementById("setMaxLevel").disabled = false;
+
+        //     // track currently rendered segments change
+        //     let tracks = player.textTracks();
+        //     let segmentMetadataTrack;
+
+        //     for (let i = 0; i < tracks.length; i++) {
+        //         if (tracks[i].label === 'segment-metadata') {
+        //             segmentMetadataTrack = tracks[i];
+        //         }
+        //     }
+
+        //     let previousPlaylist;
+
+        //     if (segmentMetadataTrack) {
+        //         segmentMetadataTrack.on('cuechange', function () {
+        //             let activeCue = segmentMetadataTrack.activeCues[0];
+
+        //             if (activeCue) {
+        //                 if (previousPlaylist !== activeCue.value.playlist) {
+        //                     console.log('Switched from rendition ' + previousPlaylist +
+        //                         ' to rendition ' + activeCue.value.playlist, activeCue.value.resolution.height);
+        //                 }
+        //                 previousPlaylist = activeCue.value.playlist;
+        //             }
+        //         });
+        //     }
+
+        // });
+            } 
+            
+    
+            
+            
+            </script>
+        <!-- <script src="./script.js"></script> -->
+    </div>
+    <div class="questionbox"></div>>
+</body>
+</html>
